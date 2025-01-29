@@ -1,0 +1,187 @@
+* {
+    border: 0;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #212529;
+    color: #f3f4f6;
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+input[type="search"]::-webkit-search-cancel-button {
+    filter: brightness(0) sepia(1) hue-rotate(180deg) saturate(1000%);
+}
+
+
+/* Home icon container */
+.home-icon-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
+
+.home-icon-container img {
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    transition: transform 0.3s, opacity 0.3s;
+}
+
+.home-icon-container img:hover {
+    transform: scale(1.1);
+    opacity: 0.8;
+}
+
+/* Content container */
+.content-container {
+    text-align: center;
+    padding: 20px;
+    max-width: 600px;
+}
+
+/* Welcome message style */
+.content-container h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.content-container .role-text {
+    color: #00bcd4; /* A bright accent color */
+}
+
+/* Search bar styles */
+.search-bar {
+    display: flex;
+    align-items: center;
+    width: 600px;
+    max-width: 500px;
+    height: 70px;
+    background: #ffffff;
+    border-radius: 1em;
+    padding: 0.75em;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
+    justify-content: flex-start; /* Align content to the left */
+}
+
+/* Search input container */
+.search-input-container {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    justify-content: space-between; /* Make space between the icon and the input */
+}
+
+.search-bar:hover {
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+}
+
+.search-bar input[type="search"] {
+    background: transparent;
+    border: none;
+    flex: 1;
+    padding: 0.5em;
+    font-size: 16px;
+    color: #000;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+
+/* Adjust search bar and icon to not overlap */
+.search-bar input[type="search"] {
+    background: transparent;
+    border: none;
+    flex: 1;
+    padding: 0.5em;
+    font-size: 16px;
+    color: #000;
+    outline: none;
+    transition: all 0.3s ease;
+}
+.search-bar .search-icon {
+    width: 35px;
+    height: 35px;
+    cursor: pointer;
+    transition: transform 0.3s, opacity 0.3s;
+    margin-left: 10px; /* Add space between the search icon and the input */
+}
+
+.search-bar .search-icon:hover {
+    transform: scale(1.1);
+    opacity: 0.8;
+}
+
+
+/* Voice icon container */
+.voice-icon-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: 10px; 
+    border: 2px solid black; 
+    border-radius: 100%; 
+    background-color: black;
+    padding: 9px;
+    transition: border-color 0.3s, border-width 0.3s; 
+}
+
+.voice-icon-container:hover {
+    border-color: #212529; 
+    border-width: 2px;
+}
+/* Voice icon */
+.voice-icon {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    transition: transform 0.3s, opacity 0.3s, filter 0.3s;
+}
+
+.voice-icon:hover {
+    transform: scale(1.2); 
+    opacity: 0.8;
+    filter: brightness(1.2); 
+}
+
+/* Logout icon container */
+.logout-icon-container {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+}
+
+.logout-icon-container img {
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.logout-icon-container img:hover {
+    transform: scale(1.1);
+}
+
+/* D3 Logo container */
+.D3-container {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+}
+
+.D3-container img {
+    padding: 10px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 150px;
+}
