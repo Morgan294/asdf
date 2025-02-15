@@ -1,56 +1,184 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import ReactDOM from 'react-dom/client';
-import '../src/css/d3_tenantchatstyle.css';
-import { Helmet } from 'react-helmet';
-import {Chart} from 'chart.js'
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import "../src/css/d3_tenantchatstyle.css";
+import ReactDOM from "react-dom/client";
+import { Helmet } from "react-helmet";
+import { Chart } from "chart.js/auto";
+import { jwtDecode } from "jwt-decode";
+import { useCookies } from "react-cookie";
+import axios from "axios";
 
 const TenantChat = () => {
-
-  const [searchText] = useState(localStorage.getItem("searchText"));
-  const [userMessage, setUserMessage] = useState("");
-  const [isLoggedIn] = useState(localStorage.getItem("loggedIn") === "true");
+  const [cookies, removeCookie] = useCookies(["token", "role", "searchText"]);
+  const [userMessage, setUserMessage] = useState();
+  const [showChat, setShowChat] = useState(window.innerWidth > 768);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [currentSession, setCurrentSession] = useState(null);
+  const [cases, setCases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchText] = useState(cookies.searchText);
   const navigate = useNavigate();
 
   useEffect(() => {
+    const tkn = cookies.token;
 
+    if (tkn) {
+      getChatHistory(tkn);
+      console.log(tkn);
+    } else {
+      console.error("No token found, redirecting to login...");
+      window.location.href = "/index";
+    }
+  }, []);
+
+  const fetchMessages = async (token) => {
+    try {
+      const response = await fetch("https://python-api.politewater-9cd83a3d.southeastasia.azurecontainerapps.io/api", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          queries: [userMessage],
+        }),
+      });
+
+      setMessages(response.data.messages);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching chat messages:", error);
+      setLoading(false);
+    }
+  };
+
+  const handleToggleChat = () => {
+    setShowChat((prev) => !prev);
+  };
+
+  const handleSessionClick = (sessionId) => {};
+
+  const getChatHistory = async (token) => {
+    const URL = "https://python-api.politewater-9cd83a3d.southeastasia.azurecontainerapps.io/chat/sessions";
+    try {
+      const response = await fetch(URL, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await response.json();
+      console.log(data);
+      setChatHistory(
+        data.sessions.sort((a, b) => {
+          return Date.parse(a.timestamp) - Date.parse(b.timestamp);
+        })
+      );
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching chat history:", error);
+      setLoading(false);
+    }
+  };
+
+  const updateChat = async (sessionid) => {
+    const URL = "https://python-api.politewater-9cd83a3d.southeastasia.azurecontainerapps.io/chat/session/" + sessionid;
+    try {
+      const response = await fetch(URL, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${cookies.token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await response.json();
+      console.log(data);
+
+      document.getElementsByClassName("chat-messages").textContent = [];
+
+      data.chat_history.map((item) => {
+        displayUserMessage(item["user_query"]);
+        displayChatbotMessage(item["bot_response"]);
+        console.log("json");
+        // console.log(JSON.parse(item['bot_response'].replaceAll('\'','\"').replaceAll('/','\\')))
+
+        //item['bot_response']
+        // const actionType = data.outputs.action;
+        // const entity = data.outputs.entity;
+
+        // if (actionType === "list") {
+
+        //   if (userMessage.toLowerCase().includes('list all cases')) {
+        //     const caseDetails = renderCasesRecord(data.outputs.data);
+        //     displayChatbotMessage("", '', caseDetails);
+        //   }
+
+        //   else if (userMessage.toLowerCase().includes('list all tenants')) {
+        //     const tenantDetails = renderTenantRecord(data.outputs.data);
+        //     displayChatbotMessage("", tenantDetails);
+        //   }
+        // }
+
+        // else if (actionType === "show_details" && entity === "case") {
+        //   if (Array.isArray(data?.outputs?.data)) {
+        //     const caseDetailsFormatted = renderCaseDetailsFormatted(data.outputs.data);
+
+        //     displayChatbotMessage("", "", "", caseDetailsFormatted);
+        //   }
+        // }
+
+        // else if (actionType === "show" && entity === "tenant") {
+        //   if (Array.isArray(data?.outputs?.data)) {
+        //     const tenantDetails = renderTenantRecord(data.outputs.data);
+        //     displayChatbotMessage(tenantDetails);
+        //   }
+        // }
+      });
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching chat history:", error);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     const logoutButton = document.getElementById("logoutButton");
     const sendButton = document.getElementById("send-button");
     const userInput = document.getElementById("user-input");
 
-    // Check if logoutButton exists before adding the event listener
+    const handleLogout = () => {
+      removeCookie("role");
+      navigate("/index");
+    };
+
     if (logoutButton) {
-      const handleLogout = () => {
-        localStorage.removeItem("loggedIn");
-        localStorage.removeItem("role");
-        navigate('/index');
-      };
-
       logoutButton.addEventListener("click", handleLogout);
-
-      // Cleanup event listener on component unmount
-      return () => {
-        logoutButton.removeEventListener("click", handleLogout);
-      };
     }
 
-    // Check if sendButton exists before adding the event listener
     if (sendButton) {
       sendButton.addEventListener("click", sendMessage);
     }
-    // Check if userInput exists before adding the keypress event listener
+
     if (userInput) {
-      userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+      userInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
           sendMessage();
         }
       });
     }
-    // Voice recognition setup
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    return () => {
+      logoutButton.removeEventListener("click", handleLogout);
+      sendButton.removeEventListener("click", sendMessage);
+    };
+  }, []);
+
+  const handleVoiceInput = () => {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
       recognition.lang = "en-US";
       recognition.interimResults = false;
 
@@ -60,159 +188,138 @@ const TenantChat = () => {
       };
 
       recognition.onerror = (event) => {
-        console.error("Error occurred in speech recognition: " + event.error);
+        console.error("Speech recognition error: " + event.error);
         alert("Speech recognition error: " + event.error);
       };
 
-      const voiceInputBtn = document.getElementById("voice-input-btn");
-      voiceInputBtn.addEventListener("click", () => {
-        recognition.start();
-      });
+      recognition.start();
     } else {
       alert("Speech Recognition API is not supported in this browser.");
     }
-
-    // Cleanup on component unmount
-    return () => {
-      logoutButton.removeEventListener("click", handleLogout);
-    };
-  }, [isLoggedIn, navigate]);
+  };
 
   useEffect(() => {
     if (searchText) {
       const searchDisplay = document.getElementById("search-display");
-      searchDisplay.textContent = searchText;
+      if (searchDisplay) {
+        searchDisplay.textContent = searchText;
+      }
       chatResponse(searchText);
     }
   }, [searchText]);
 
-
   //Chat Response
   const chatResponse = async (userMessage) => {
-    const API_URL =
-      "https://python-api.politewater-9cd83a3d.southeastasia.azurecontainerapps.io/api";
+    const API_URL = "https://python-api.politewater-9cd83a3d.southeastasia.azurecontainerapps.io/api";
     console.log("User message:", userMessage);
+
+    const token = cookies?.token;
+    if (!token) {
+      console.error("❌ No authentication token found.");
+      displayChatbotMessage("Authentication error. Please log in again.");
+      return;
+    }
 
     try {
       const response = await fetch(API_URL, {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          queries: [userMessage],
-        }),
+        body: JSON.stringify({ queries: [userMessage] }),
       });
 
+      // ✅ Ensure response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("❌ API response is not JSON. Received:", contentType);
+        displayChatbotMessage("Invalid response format. Expected JSON.");
+        return;
+      }
+
       const data = await response.json();
-      console.log("Response Data:", data);
-      console.log("Raw response data:", JSON.stringify(data));
+      console.log("📌 Parsed API Response:", data);
+
+      if (!data || !data.outputs) {
+        console.error("❌ Invalid API response structure.");
+        displayChatbotMessage("Unexpected response from the server.");
+        return;
+      }
 
       let textResponse = "";
-
-      if (data?.outputs?.action) {
-        const actionType = data.outputs.action;
-        const entity = data.outputs.entity;
-
-        if (actionType === "list") {
-          if (Array.isArray(data?.outputs?.data)) {
-            if (data.outputs.data.length === 0) {
-              displayChatbotMessage("There is no record to display");
-            } else {
-              // Render cases table when "list all cases" is requested
-              if (userMessage.toLowerCase().includes('list all cases')) {
-                const caseDetails = renderCasesRecord(data.outputs.data);
-                displayChatbotMessage("", '', caseDetails);
-              }
-              // Render tenant table when "list all tenants" is requested
-              else if (userMessage.toLowerCase().includes('list all tenants')) {
-                const tenantDetails = renderTenantRecord(data.outputs.data);
-                displayChatbotMessage("", tenantDetails);
-              }
-            }
-          } else {
-            textResponse = data?.outputs?.data?.message || "Invalid response data";
-            displayChatbotMessage(textResponse);
-          }
-        } else if (actionType === "show_details" && entity === "case") {
-          if (Array.isArray(data?.outputs?.data)) {
-            const caseDetailsFormatted = renderCaseDetailsFormatted(data.outputs.data);
-            // Pass JSX directly, not as a string
-            displayChatbotMessage("", "", "", caseDetailsFormatted);
-          }
-        } else if (actionType === "show" && entity === "tenant") {
-          if (Array.isArray(data?.outputs?.data)) {
-            const tenantDetails = renderTenantRecord(data.outputs.data);
-            displayChatbotMessage(tenantDetails);
-          }
+      if (data.outputs.action === "list") {
+        const records = data.outputs.data?.value;
+        if (Array.isArray(records) && records.length > 0) {
+          const caseDetails = renderCasesRecord(records);
+          displayChatbotMessage(caseDetails);
+        } else {
+          displayChatbotMessage("No cases found.");
         }
       } else {
-        textResponse = data?.outputs || "Unexpected response structure.";
+        textResponse = data.outputs || "Unexpected response structure.";
         displayChatbotMessage(textResponse);
       }
     } catch (error) {
-      console.error("Error:", error);
+      console.error("❌ API Request Failed:", error);
       displayChatbotMessage("An error occurred while processing your request.");
     }
   };
 
-  // Case Details
-const renderCaseDetailsFormatted = (caseData) => {
-  if (!Array.isArray(caseData) || caseData.length === 0) {
-    return '<div class="case-detail"><p>No case details available.</p></div>';
-  }
-
-  return caseData.map((textResponseItem, index) => {
-    const caseNumber = textResponseItem?.cr425_casenumber || 'N/A';
-    const caseSubject = textResponseItem?.cr425_subject || 'N/A';
-    const caseSummary = textResponseItem?.cr425_casesummary || 'N/A';
-    const casePriority = getCasePriorityLabel(textResponseItem?.cr425_priority) || 'N/A';
-    const caseCategory = getCaseCategoryLabel(textResponseItem?.cr425_category) || 'N/A';
-    const caseStatus = getCaseStatusLabel(textResponseItem?.cr425_casestatus) || 'N/A';
-
-    return `
-      <div key="${index}" class="case-detail">
-        <p><strong>Case Number:</strong> ${caseNumber}</p>
-        <p><strong>Case Subject:</strong> ${caseSubject}</p>
-        <p><strong>Case Summary:</strong> ${caseSummary}</p>
-        <p><strong>Case Priority:</strong> ${casePriority}</p>
-        <p><strong>Case Category:</strong> ${caseCategory}</p>
-        <p><strong>Case Status:</strong> ${caseStatus}</p>
-      </div>
-    `;
-  }).join(''); // Combine the array into a single string
-};
-
-
   //Case Records
   const renderCasesRecord = (casesData) => {
-    return casesData
+    if (!Array.isArray(casesData) || casesData.length === 0) {
+      return "<p>No cases available.</p>";
+    }
+
+    const caseRows = casesData
       .map((item) => {
         const caseNumber = item?.cr425_casenumber || "N/A";
         const caseSubject = item?.cr425_subject || "N/A";
-        const casePriority = getCasePriorityLabel(item?.cr425_priority) || "N/A";
+        const casePriority =
+          getCasePriorityLabel(item?.cr425_priority) || "N/A";
+        const caseStatus = 
+          getCaseStatusLabel(item?.cr425_casestatus) || "N/A";
+
         return `
           <tr>
             <td>${caseNumber}</td>
             <td>${caseSubject}</td>
-            <td>${casePriority}</td>
+            <td><span class="priority-${casePriority.toLowerCase()}">${casePriority}</span></td>
+            <td>${caseStatus}</td>
           </tr>
         `;
       })
       .join("");
-  };
 
+    return `
+      <table class="table-cases">
+        <thead>
+          <tr>
+            <th>Case Number</th>
+            <th>Subject</th>
+            <th>Priority</th>
+            <th>Case Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${caseRows}
+        </tbody>
+      </table>
+    `;
+  };
 
   //Tenant Record
   const renderTenantRecord = (tenantData) => {
-    return tenantData
-      .map((item) => {
-        const tenantName = item?.d3_name || "N/A";
-        const tenantAddress = item?.d3_addressline1 || "N/A";
-        const rentAmount = item?.d3_rentamount || "N/A";
-        const startDate = item?.["d3_startdate@OData.Community.Display.V1.FormattedValue"] || "N/A";
+    return tenantData.map((item) => {
+      const tenantName = item?.d3_name || "N/A";
+      const tenantAddress = item?.d3_addressline1 || "N/A";
+      const rentAmount = item?.d3_rentamount || "N/A";
+      const startDate =
+        item?.["d3_startdate@OData.Community.Display.V1.FormattedValue"] ||
+        "N/A";
 
-        return `
+      return `
           <tr>
             <td>${tenantName}</td>
             <td>${tenantAddress}</td>
@@ -220,10 +327,8 @@ const renderCaseDetailsFormatted = (caseData) => {
             <td>${rentAmount}</td>
           </tr>
         `;
-      })
-      .join("");
+    });
   };
-
 
   //Priority
   const getCasePriorityLabel = (priorityValue) => {
@@ -267,28 +372,30 @@ const renderCaseDetailsFormatted = (caseData) => {
 
     if (userMessage) {
       displayUserMessage(userMessage);
-
-      // Generate the chatbot's response
       chatResponse(userMessage);
-
-      // Clear the input field
       inputElement.value = "";
     }
   };
 
   //DisplayUserMessage
   const displayUserMessage = (message) => {
-    const chatMessagesContainer = document.querySelector('.chat-messages');
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('chat-message-right', 'pb-4');
-
+    const chatMessagesContainer = document.querySelector(".chat-messages");
+    const messageElement = document.createElement("div");
+    messageElement.classList.add("chat-message");
     messageElement.innerHTML = `
-            <div>
-              <img src="https://bootdey.com/img/Content/avatar/avatar1.png" class="rounded-circle mr-1" alt="User Avatar" width="40" height="40">
-              <div class="text-muted small text-nowrap mt-2"></div>
-            </div>
-            <div class="flex-shrink-1 bg-light rounded py-2 px-3 mr-3">
-              <p>${message}</p>
+            <div class="chat-message">
+              <div class="chat-message">
+                <figure class="chat-avatar">
+                  <img
+                    src="images/d3_userchat.png"
+                    alt="User Avatar"
+                  />
+                </figure>
+                <div class="chat-bubble">
+                  <div class="username-display"></div>
+                  <p>${message}</p>
+                </div>
+              </div>
             </div>
           `;
 
@@ -296,21 +403,20 @@ const renderCaseDetailsFormatted = (caseData) => {
     chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
   };
 
-  window.addEventListener('load', async () => {
+  window.addEventListener("load", async () => {
     try {
-      const clearStateURL =
-        'https://python-api.politewater-9cd83a3d.southeastasia.azurecontainerapps.io/clear';
-      await fetch(clearStateURL, { method: 'POST' });
-      console.log('Conversation state cleared on page load.');
+      const clearStateURL = "https://python-api.politewater-9cd83a3d.southeastasia.azurecontainerapps.io/clear";
+      await fetch(clearStateURL, { method: "POST" });
+      console.log("Conversation state cleared on page load.");
     } catch (error) {
-      console.error('Failed to clear state:', error);
+      console.error("Failed to clear state:", error);
     }
   });
 
   const displayChatbotMessage = (message, tenantDetails = '', caseDetails = '', caseDetailsFormatted = '') => {
     const chatMessagesContainer = document.querySelector('.chat-messages');
     const messageElement = document.createElement('div');
-    messageElement.classList.add('chat-message-left', 'pb-4');
+    messageElement.classList.add('chat-message-left', 'bot-message');
   
     let content = '';
     console.log('Case Details Formatted:', caseDetailsFormatted);
@@ -383,14 +489,10 @@ const renderCaseDetailsFormatted = (caseData) => {
     }
   
     messageElement.innerHTML = `
-      <div>
-        <img src="images/d3_robotchat.png" class="rounded-circle mr-1" width="100" height="60">
-        <div class="text-muted small text-nowrap mt-2"></div>
-      </div>
-      <div class="flex-shrink-1 bg-light rounded py-2 px-3 ml-3">
-        <div class="font-weight-bold mb-1">Chatbot</div>
-        ${content}
-      </div>
+        <div class="chat-bubble">${content}</div>
+        <figure class="chatbot-avatar">
+            <img src="images/d3_robotchat.png" alt="Chatbot Avatar">
+        </figure>
     `;
 
     chatMessagesContainer.appendChild(messageElement);
@@ -412,19 +514,19 @@ const renderCaseDetailsFormatted = (caseData) => {
               'rgba(255, 26, 104, 0.2)',
               'rgba(54, 162, 235, 0.2)',
               'rgba(255, 206, 86, 0.2)',
-              'rgba(75, 192, 192, 0.2)',
-              'rgba(153, 102, 255, 0.2)',
-              'rgba(255, 159, 64, 0.2)',
-              'rgba(0, 0, 0, 0.2)',
+              // 'rgba(75, 192, 192, 0.2)',
+              // 'rgba(153, 102, 255, 0.2)',
+              // 'rgba(255, 159, 64, 0.2)',
+              // 'rgba(0, 0, 0, 0.2)',
             ],
             borderColor: [
               'rgba(255, 26, 104, 1)',
               'rgba(54, 162, 235, 1)',
               'rgba(255, 206, 86, 1)',
-              'rgba(75, 192, 192, 1)',
-              'rgba(153, 102, 255, 1)',
-              'rgba(255, 159, 64, 1)',
-              'rgba(0, 0, 0, 1)',
+              // 'rgba(75, 192, 192, 1)',
+              // 'rgba(153, 102, 255, 1)',
+              // 'rgba(255, 159, 64, 1)',
+              // 'rgba(0, 0, 0, 1)',
             ],
             borderWidth: 1,
           },
@@ -443,99 +545,111 @@ const renderCaseDetailsFormatted = (caseData) => {
     }
   };
 
-
-
   return (
-    <main className="content">
-
+    <main className="chat-main">
       <Helmet>
         <title>My Chat</title>
       </Helmet>
 
       <meta charSet="UTF-8" />
+
       <link
         rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
       />
-      <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
-      />
-      <div className="container p-0">
 
-        <h1 className="h6 mt-3 mb-3 d-flex justify-content-between align-items-center" >
-          <Link to="/landingpage" style={{ fontSize: "15px", color: 'white'}}>
-            <i className="fa fa-home mr-2"></i> Home
-          </Link>
-          <a
-            id="logoutButton"
-            title="Logout"
-            style={{ cursor: "pointer" }}
-          >
-            <img src="images/tenantlogout.png" alt="logout" />
-          </a>
-        </h1>
-
-        <div className="card">
-          <div className="row g-0">
-            <div className="col-12 col-lg-12 col-xl-12">
-              <div className="position-relative">
-                <div className="chat-messages p-4">
-                  {/* User Message */}
-                  <div className="chat-message-right pb-4">
-                    <div>
-                      <img
-                        src="https://bootdey.com/img/Content/avatar/avatar1.png"
-                        className="rounded-circle mr-1"
-                        alt="User Avatar"
-                        width="40"
-                        height="40"
-                      />
-                      <div className="text-muted small text-nowrap mt-2"></div>
-                    </div>
-                    <div className="flex-shrink-1 bg-light rounded py-2 px-3 mr-3">
-                      <div className="font-weight-bold mb-1 username-display"></div>
-                      <p id="search-display"></p>
-                    </div>
-                  </div>
-
-                </div>
-
-
+      <nav className={`chat-sidebar ${showChat ? "" : "hidden"}`}>
+        <div className="chatList">
+          <button onClick={() => navigate("/landingpage")}>
+            Create a new Chat
+          </button>
+          <span className="title">RECENT CHATS</span>
+          {chatHistory?.map((item, index) => {
+            return (
+              <div key={index}>
+                <button
+                  className="list"
+                  id={"Chat" + index}
+                  onClick={() => updateChat(item["session_id"])}
+                >
+                  Last User Query: {item["last_user_query"]}
+                </button>
               </div>
-              <div className="flex-grow-0 py-3 px-4 border-top">
-                <div className="input-group">
-                  <input
-                    type="text"
-                    id="user-input"
-                    className="form-control"
-                    placeholder="Type your message"
-                  />
-                  <img
-                    src="images/d3_voice_icon.png"
-                    alt="Voice Input"
-                    id="voice-input-btn"
-                    style={{
-                      cursor: "pointer",
-                      width: "38px",
-                      height: "40px",
-                      marginLeft: "10px",
-                      marginRight: "10px",
-                      borderRadius: "10px"
-                    }}
-                  />
-                  <button id="send-button" type='button' onClick={sendMessage}>
-                    Send
-                  </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <div className="chat-wrapper">
+        <header className="chat-header">
+          <div className="chat-header-left">
+            <button
+              title="Menu"
+              className="menu-toggle"
+              onClick={handleToggleChat}
+              aria-label="Toggle chat menu"
+            >
+              <i className="fa fa-bars"></i>
+            </button>
+            <Link to="/landingpage" className="home-link">
+              <i className="fa fa-home"></i> Home
+            </Link>
+          </div>
+          <button
+            id="logoutButton"
+            className="logout-btn"
+            title="Logout"
+            aria-label="Logout"
+          >
+            <img src="images/tenantlogout.png" alt="Logout" />
+          </button>
+        </header>
+
+        <section className={`chat-container ${showChat ? "shrink" : ""}`}>
+          <div className="chat-card">
+            <div className="chat-messages">
+              <div className="chat-message">
+                <figure className="chat-avatar">
+                  <img src="images/d3_userchat.png" alt="User Avatar" />
+                </figure>
+                <div className="chat-bubble">
+                  <div className="username-display"></div>
+                  <p>
+                    {searchText
+                      ? searchText
+                      : "No messages available for this session."}
+                  </p>
                 </div>
               </div>
             </div>
+
+            <footer className="chat-input-box">
+              <div className="input-group">
+                <input
+                  id="user-input"
+                  type="text"
+                  className="chat-input"
+                  placeholder="Type your message"
+                  onChange={(e) => setUserMessage(e.target.value)}
+                />
+                <div className="voice-icon-wrapper">
+                  <i
+                    className="fa-solid fa-microphone"
+                    id="voice-input-btn"
+                    alt="Voice Input"
+                    onClick={handleVoiceInput}
+                  ></i>
+                </div>
+                <button id="send-button" className="send-button" type="button">
+                  Send
+                </button>
+              </div>
+            </footer>
           </div>
-        </div>
+        </section>
       </div>
     </main>
   );
-
 };
 
 export default TenantChat;
